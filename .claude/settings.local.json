@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__98c8fd16-d238-4611-aa85-39d0c19af954__edit_file",
+      "mcp__98c8fd16-d238-4611-aa85-39d0c19af954__write_file",
+      "mcp__98c8fd16-d238-4611-aa85-39d0c19af954__create_checkpoint",
+      "mcp__98c8fd16-d238-4611-aa85-39d0c19af954__run_command",
+      "mcp__98c8fd16-d238-4611-aa85-39d0c19af954__read_file",
+      "mcp__98c8fd16-d238-4611-aa85-39d0c19af954__grep",
+      "mcp__98c8fd16-d238-4611-aa85-39d0c19af954__list_directory",
+      "mcp__98c8fd16-d238-4611-aa85-39d0c19af954__list_entity_schemas"
+    ]
+  }
+}

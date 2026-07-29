@@ -79,12 +79,14 @@ De `hasAccess`-check voor events van niet-actieve organisaties kijkt alleen naar
 
 **Kleinere observatie:** leden worden zonder uitnodiging/acceptatie toegevoegd — het e-mailadres is meteen lid. Dat is snel, maar de betrokkene merkt er niets van tot hij inlogt, en een typefout in het e-mailadres maakt stilletjes een "spooklid" aan.
 
-## 7. Aanbevelingen (niet uitgevoerd)
+## 7. Aanbevelingen — status na aanpassing (29 juli 2026)
 
-1. **Organisatie-wisselaar** in de app-header: dropdown met alle organisaties waar je lid van bent; wisselen zet `current_organization_id` en herlaadt de context. Lost gap A op en maakt het model "daar gelden hun machtigingen, thuis ben ik admin" echt bruikbaar.
-2. **Banner-conditie aanpassen**: toon "Maak je eigen organisatie aan" wanneer de gebruiker geen organisatie **bezit** (geen org met `owner_email` = eigen e-mail), in plaats van wanneer er geen actieve organisatie is. Lost gap B op.
-3. **`hasAccess` uitbreiden**: events van organisaties waarvan je **eigenaar** bent altijd tonen (en desgewenst: waar je org-rol `can_view_guests`/eventrechten geeft). Lost gap C op.
-4. Optioneel: een lichte **uitnodigingsflow** (e-mailnotificatie + acceptatie) om spookleden en typefouten te voorkomen.
+1. ✅ **Organisatie-wisselaar** — uitgevoerd. Nieuw component `src/components/OrgSwitcher.jsx` in de app-header: dropdown met alle organisaties waar je lid van bent (met label Eigenaar/Lid en vinkje bij de actieve). Kiezen zet `current_organization_id` en herlaadt de app op het dashboard. Verbergt zichzelf bij minder dan twee organisaties.
+2. ✅ **Banner-conditie aangepast** — uitgevoerd. "Maak je eigen organisatie aan" verschijnt nu zolang de gebruiker geen organisatie **bezit** (geen organisatie met `owner_email` = eigen e-mail), ook wanneer hij al lid is van andermans organisatie.
+3. ✅ **Eigen events altijd zichtbaar** — uitgevoerd. Het dashboard toont events van organisaties waarvan je **eigenaar** bent nu altijd, ook als een andere organisatie actief is.
+4. ⏳ Optioneel, niet uitgevoerd: een lichte **uitnodigingsflow** (e-mailnotificatie + acceptatie) om spookleden en typefouten te voorkomen.
+
+Daarmee zijn de gaps A, B en C uit hoofdstuk 6 gedicht; het gewenste model ("admin in je eigen account, elders onder hun machtigingen, maar je eigen events blijven zichtbaar") is nu volledig geïmplementeerd.
 
 ---
 

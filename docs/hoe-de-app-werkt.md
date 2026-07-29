@@ -55,10 +55,14 @@ De lijstkaarten tonen nu de bezetting in personen (niet in records), het aantal 
 
 Een gast-record heeft o.a. `party_size` (aantal personen) en `plus_ones_allowed` (waarvan gratis). Er zijn vier toevoegroutes, en **alle vier** passeren dezelfde controles:
 
-1. **Snel toevoegen** (AddGuestPanel, één gast);
-2. **Bestand-import** (Excel/CSV);
-3. **Tekst-import** (regels plakken);
-4. **Gast-dialog** (uitgebreid formulier).
+1. **Snel toevoegen** (AddGuestPanel: één gast, bestand-import, tekst-import);
+2. **Import-wizard** (ImportGuestsDialog: Excel/CSV met kolom-mapping, preview, dedup en batches);
+3. **Gast-dialog** (uitgebreid formulier);
+4. **Gasten toevoegen-paneel** op de GuestManager-pagina (enkel, bestand, tekst).
+
+Alle importroutes registreren nu ook wie de gasten toevoegde (`added_by_email`), zodat de rol-quota ook bij imports correct meetelt.
+
+**Basisregel: het aantal gratis personen kan nooit groter zijn dan het totaal aantal personen.** Bij handmatig invoeren (Snel toevoegen, Gast-dialog — ook bij bewerken) geeft de app een foutmelding; bij imports wordt het aantal gratis per rij automatisch begrensd op het aantal personen van die rij.
 
 Volgorde van controles bij het opslaan:
 

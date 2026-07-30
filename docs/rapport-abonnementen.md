@@ -13,12 +13,21 @@
 3. **Promocodes server-side (was K4).** `redeemPromoCode` draait als backend-functie met eigenaar-check, geldigheids-/verloop-/max_uses-controles en service-role updates. `Pricing.jsx` roept deze functie aan; de oude client-side activatie is weg.
 4. **Betaalpagina claimt geen succes meer (was H5a).** `PaymentReturn` toont "Zodra Mollie de betaling bevestigt, wordt je aankoop automatisch geactiveerd" in plaats van een onterecht "Betaling geslaagd!"; de webhook activeert alleen bij status `paid`.
 
+## ✅ Aangepast op 30 juli — verlengingsmodel + afloop-handhaving
+
+Het gewenste model is geïmplementeerd: **automatische verlenging staat standaard aan** (een betaald plan loopt gewoon door) en met **één knop** zet de eigenaar de verlenging uit, waarna het plan aan het einde van de huidige periode terugvalt op **free**.
+
+- **Schema**: `Organization.auto_renew` (boolean, standaard `true`); de Mollie-webhook zet hem bij elke betaling weer aan.
+- **Effectief plan** (`getEffectivePlanKey`/`getEffectiveLimits` in `planLimits.js`): een plan met verstreken `subscription_ends_at` (verlenging uitgezet, of promo-periode voorbij) telt als **free** — en álle limiet-handhaving (gasten, evenementen, locaties, leden) gebruikt nu dit effectieve plan: EventDialog, AddGuestPanel, GuestDialog, Dashboard, OrganizationSettings, VenueManagement. 13 unit-tests op deze logica slagen.
+- **Server-side beheer** (nieuwe backend-functie `manageSubscription`, met eigenaar-check — dicht meteen M10): `auto_renew_off` (einddatum = einde huidige periode), `auto_renew_on` (einddatum vervalt, weer actief), `downgrade_now` (direct naar free).
+- **Pricing-UI**: knop "Automatische verlenging uitzetten" op het actieve plan; staat hij uit, dan toont de kaart "Loopt tot {datum}, daarna Free" met een knop om hem weer aan te zetten; is het plan verlopen, dan meldt de pagina dat de Free-limieten gelden. De directe free-downgrade loopt ook via de backend-functie, met bevestiging.
+- **Promo's** verlopen nu echt: na de promo-einddatum gelden de free-limieten (bijv. Place2Party per 6 oktober, tenzij zij vóór die tijd betalen).
+
 ## ⚠️ Nog open (bekende beperkingen)
 
-1. **Geen echte verlenging of afloop (A1).** Niets incasseert een volgende termijn (geen Mollie Subscriptions) en niets beëindigt een plan wanneer `subscription_ends_at`/`next_renewal_date` verstrijkt. Gevolg: een opgezegd abonnement blijft ná de einddatum gewoon doorlopen, promo-plannen verlopen nooit, en maandabonnees betalen één keer en houden het plan. Dit is het belangrijkste resterende punt.
+1. **Geen automatische incasso.** "Verlenging aan" betekent: het plan loopt door zonder onderbreking; er wordt niet automatisch een nieuwe betaling geïncasseerd (dat vergt Mollie Subscriptions met mandaten). Facturatie van verlengingen blijft dus handmatig/extern.
 2. **`mollieCreatePayment` mist een ownership-check (H5b).** Ingelogd zijn is vereist, maar er wordt niet gecontroleerd of de betaler bij `organizationId`/`eventId` hoort. Beperkt risico (de "aanvaller" betaalt écht geld), maar hoort dicht.
 3. **Geen webhook-idempotentie.** Een opnieuw afgeleverde webhook herschrijft dezelfde waarden; bij een abonnement verschuift daarbij de verlengingsdatum naar "nu + periode". Klein risico; op te lossen door verwerkte `paymentId`'s op te slaan.
-4. **Opzeggen en downgraden naar free zijn nog client-side (M10).** De browser doet rechtstreeks `Organization.update`. Zelfde patroon als de (inmiddels gerepareerde) promocode; hoort in een backend-functie met eigenaar-check.
 
 ## 📋 Datacheck
 

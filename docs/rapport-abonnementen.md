@@ -23,11 +23,24 @@ Het gewenste model is geïmplementeerd: **automatische verlenging staat standaar
 - **Pricing-UI**: knop "Automatische verlenging uitzetten" op het actieve plan; staat hij uit, dan toont de kaart "Loopt tot {datum}, daarna Free" met een knop om hem weer aan te zetten; is het plan verlopen, dan meldt de pagina dat de Free-limieten gelden. De directe free-downgrade loopt ook via de backend-functie, met bevestiging.
 - **Promo's** verlopen nu echt: na de promo-einddatum gelden de free-limieten (bijv. Place2Party per 6 oktober, tenzij zij vóór die tijd betalen).
 
+## ✅ Aangevuld op 30 juli — echte automatische incasso via Mollie Subscriptions
+
+1. **Mandaat bij de eerste betaling.** `mollieCreatePayment` maakt (of hergebruikt) een Mollie-customer per organisatie (`mollie_customer_id`) en start de eerste abonnementsbetaling met `sequenceType: 'first'` — daarmee legt de klant een incassomandaat vast.
+2. **Automatische incasso.** Na de eerste betaling maakt de webhook een Mollie-subscription aan (interval 1 maand of 12 maanden, startdatum = volgende verlengingsdatum, opgeslagen als `mollie_subscription_id`). Mollie incasseert vanaf dan zelf; elke incasso komt binnen als `subscription_renewal`-webhook die de toegang met één periode verlengt.
+3. **Eén knop, echt effect.** "Automatische verlenging uitzetten" annuleert nu ook de Mollie-subscription (geen incasso's meer); "weer aanzetten" controleert het mandaat en zet een nieuwe subscription op vanaf de einddatum. Directe downgrade annuleert de incasso eveneens.
+4. **Ownership-check toegevoegd (H5b dicht).** `mollieCreatePayment` controleert nu dat de betaler bij de organisatie hoort; abonnementen kan alleen de **eigenaar** (of platform-admin) afsluiten.
+5. Bij een plan- of periodewissel wordt de oude Mollie-subscription automatisch geannuleerd en vervangen.
+
+**Vereisten in het Mollie-dashboard** (buiten de code om):
+- De **webhook-URL** van het website-profiel moet naar de `mollieWebhook`-functie wijzen (dat was al zo voor losse betalingen); optioneel kan de omgevingsvariabele `MOLLIE_WEBHOOK_URL` gezet worden zodat subscriptions hem expliciet meekrijgen.
+- De **live API-key** moet recurring/incasso's toestaan (Mollie-account met Subscriptions geactiveerd).
+- Testen kan met de test-API-key: eerste betaling → controleer in het Mollie-dashboard dat er een customer, mandaat én subscription zijn aangemaakt.
+
 ## ⚠️ Nog open (bekende beperkingen)
 
-1. **Geen automatische incasso.** "Verlenging aan" betekent: het plan loopt door zonder onderbreking; er wordt niet automatisch een nieuwe betaling geïncasseerd (dat vergt Mollie Subscriptions met mandaten). Facturatie van verlengingen blijft dus handmatig/extern.
-2. **`mollieCreatePayment` mist een ownership-check (H5b).** Ingelogd zijn is vereist, maar er wordt niet gecontroleerd of de betaler bij `organizationId`/`eventId` hoort. Beperkt risico (de "aanvaller" betaalt écht geld), maar hoort dicht.
-3. **Geen webhook-idempotentie.** Een opnieuw afgeleverde webhook herschrijft dezelfde waarden; bij een abonnement verschuift daarbij de verlengingsdatum naar "nu + periode". Klein risico; op te lossen door verwerkte `paymentId`'s op te slaan.
+1. **Geen webhook-idempotentie.** Een opnieuw afgeleverde webhook herschrijft dezelfde waarden; bij een verlenging verschuift daarbij de verlengingsdatum naar "nu + periode". Klein risico; op te lossen door verwerkte `paymentId`'s op te slaan.
+2. **Mislukte incasso's worden niet gedetecteerd.** Als Mollie een incasso definitief niet kan innen (subscription wordt dan door Mollie gestopt), merkt de app dat niet vanzelf; het plan loopt door tot er handmatig wordt ingegrepen. Oplosbaar met een periodieke controle van de subscription-status.
+3. **Bestaande betaalde organisaties hebben nog geen mandaat.** Zij vallen pas onder automatische incasso nadat ze (bij de volgende betaling) opnieuw via de checkout betalen.
 
 ## 📋 Datacheck
 

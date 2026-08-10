@@ -60,19 +60,31 @@ GuestManager en ImportGuestsDialog.
 
 ## 3. Verbeterplan in drie fasen
 
-### Fase 1 — handhaving repareren (geen schemawijziging)
+### Fase 1 — handhaving repareren (DOORGEVOERD)
 
-- `checkAdditionsAllowed` uitbreiden met de EventUserPermission-limieten van de toevoegende
-  gebruiker (totaal, gratis, tijdslot), per lijst én voor "hele event"-records.
-- Per-lijst-scoping van `can_add`/`can_checkin`: de hook laat naast `allowedGuestListIds` (view)
-  ook `addableGuestListIds` en `checkinGuestListIds` teruggeven; AddGuestPanel/GuestManager/
-  ImportGuestsDialog filteren hun lijst-dropdowns daarop, en het "meest permissieve"-fallback
-  in `eventPermissionsToFlags` vervalt voor lijst-gebonden records.
-- "Eigen gasten"-regel: `can_add_guests ⇒` eigen rijen (op `added_by_email`) altijd zichtbaar,
-  bewerkbaar en verwijderbaar, ook zonder view/edit/delete-recht.
-- Default-deny: schema-default van `can_view_guests` naar `false` en `DEFAULT_PERMISSIONS`
-  op alles-uit; EventDetails toont dan een nette "geen toegang"-melding.
-- Import/export-knoppen achter `can_import_guests`/`can_export_guests`.
+- **EventUserPermission-limieten afgedwongen**: `checkEventUserPermLimits` in
+  `src/lib/guestListLimits.js` toetst nu bij elke toevoeging (enkel, import, tekst — via het
+  centrale `checkAdditionsAllowed`) het persoonlijke tijdslot en max totaal/gratis personen,
+  per gastenlijst-record én voor "hele event"-records; platform-admin en organisatie-eigenaar
+  vallen erbuiten.
+- **Per-lijst-scoping van toevoegen/inchecken**: de hook geeft naast `allowedGuestListIds`
+  (bekijken) nu ook `addableGuestListIds` en `checkinGuestListIds` terug. AddGuestPanel toont
+  alleen toegestane lijsten in de dropdowns, `checkAdditionsAllowed` weigert toevoegingen
+  buiten de scope (dekt ook GuestManager en ImportGuestsDialog), en het Check-in Station plus
+  de check-in-knoppen in de tabel respecteren de check-in-scope. Lijst-gebonden `can_admin`
+  geeft niet langer event-brede admin.
+- **Eigen-gasten-regel**: wie mag toevoegen ziet, bewerkt en verwijdert zijn eigen gasten
+  (op `added_by_email`), ook zonder view/edit/delete-recht — in de tabel én de zijbalk.
+- **Default-deny**: `DEFAULT_PERMISSIONS` staat op alles-uit, het schema-default van
+  `EventUserPermission.can_view` is `false`, nieuw toegevoegde gebruikers in
+  Evenement-machtigingen starten zonder rechten, en EventDetails toont een
+  "Geen toegang"-melding voor wie geen enkel recht heeft.
+- **Import/export-gates**: de import- en exportknoppen in EventDetails controleren nu
+  `can_import_guests`/`can_export_guests` van de organisatierol.
+
+Restpunt fase 1: de lijst-dropdowns in GuestManager zijn nog niet visueel gefilterd op de
+add-scope (de centrale controle blokkeert wel), en de vlag-berekening bleef verder
+first-match-override — de unie komt in fase 2.
 
 ### Fase 2 — unie-semantiek
 

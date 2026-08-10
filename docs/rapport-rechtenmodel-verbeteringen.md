@@ -100,21 +100,30 @@ voorgaan op de lijst-scope van directe event-records. Limieten stapelen als *mee
 geldige waarde*: lijst-limieten, persoonlijke event-limieten en rol-quota worden allemaal
 toegepast; leeg = geen limiet op dat niveau.
 
-### Fase 3 — schema-unificatie
+### Fase 3 — objectquota, monotoon verbruik en sjabloonrechten (DOORGEVOERD)
 
-- Eén entiteit `PermissionGrant`: `user_email`, `scope_type`
-  (`organization|venue|event_template|event`), `scope_id`, nullable `guest_list_id`, de vlaggen
-  (`admin`, `view_guests`, `add_guests`, `edit_guests`, `delete_guests`, `check_in_guests`),
-  de limieten (`max_total`, `max_free`, `add_from_at`, `add_until_at`) en `is_external`.
-- Eén entiteit `ScopeQuota` voor "Iedereen in totaal": `scope_type`, `scope_id`, nullable
-  `guest_list_id`, `max_total`, `max_free`.
-- Monotone verbruiksteller: entiteit `QuotaUsage` (`event_id`, `user_email`, nullable
-  `guest_list_id`, `consumed_total`, `consumed_free`) die bij toevoegen ophoogt en bij
-  verwijderen alleen verlaagt wanneer de gast **nooit ingecheckt** was.
-- Rechten op `EventTemplate` die overerven naar events die het sjabloon gebruiken.
-- Migratie: VenueRole/EventUserPermission 1-op-1 omzetten naar grants; Role/UserRole en
-  OrganizationRole blijven als benoemde-rol-laag die bij toekenning naar grants "uitvouwt"
-  of als aparte bron in de unie blijft meedraaien.
+- **`ScopeQuota` ("Iedereen in totaal")**: nieuwe entiteit met `scope_type`, `scope_id`,
+  nullable `guest_list_id`, `max_total` en `max_free`. Het event-brede plafond is instelbaar
+  bovenaan de Evenement-machtigingen-pagina en wordt in `checkAdditionsAllowed` als hard
+  plafond gehandhaafd — ook voor admins en eigenaren, onafhankelijk van individuele limieten.
+  Per-lijst-plafonds blijven op de gastenlijsten zelf (`max_capacity`/`max_free_guests`).
+- **Monotoon verbruik via `QuotaConsumption`**: bij het verwijderen van een gast die ooit
+  ingecheckt was, schrijven alle verwijder-paden (EventDetails enkel + bulk, GuestManager)
+  een verbruiksrecord (`src/lib/quotaConsumption.js`). Alle quotatellingen — lijst-capaciteit,
+  persoonlijke event-limieten, rol-quota en objectquota — tellen die records mee. Verwijderen
+  van een nooit-ingecheckte gast geeft het quotum gewoon vrij; het tombstone-model maakt een
+  aparte teller-bijwerking bij het toevoegen overbodig.
+- **Sjabloonrechten via duplicatie**: het dupliceren van een (sjabloon-)event kopieert nu ook
+  de EventUserPermission-records en ScopeQuota's mee, met hermapping van gastenlijst-IDs.
+  In het copy-gebaseerde sjabloonmodel van Glistix vervult dat de rol van Attendiums
+  sjabloonrechten: rechten die je op een sjabloon-event zet, gelden voor elk event dat ervan
+  wordt afgeleid.
+
+**Bewust uitgesteld**: de volledige unificatie naar één `PermissionGrant`-tabel (met
+`is_external`-markering voor cross-organisatie-gebruikers) is niet uitgevoerd — dat vergt een
+datamigratie van vijf bestaande dragers plus herbouw van alle rechten-panelen in één keer, en
+de unie-resolutie van fase 2 levert functioneel hetzelfde resultaat. Het blijft de aangewezen
+vervolgstap wanneer de rechten-UI toch herbouwd wordt.
 
 ## 4. Kanttekening
 

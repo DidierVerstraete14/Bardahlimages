@@ -1,0 +1,105 @@
+# Rechtenmodel Glistix — gap-analyse en verbeterplan
+
+Vergelijking van de huidige Glistix-implementatie met het onderzochte Attendium-rechtenmodel
+(account → locatie → sjabloon → event → gastenlijst, additief capability-model met limieten).
+Alle bevindingen hieronder zijn geverifieerd in de broncode van de Base44-app.
+
+## 1. Wat er nu staat
+
+Rechten leven verspreid over **vijf dragers**, elk met eigen veldnamen en semantiek:
+
+| Drager | Niveau | Bijzonderheden |
+|---|---|---|
+| `OrganizationMember` → `OrganizationRole` | organisatie | ~28 booleans, plus rol-quota `max_total_guests`/`max_free_guests` (per evenement, gehandhaafd) |
+| `VenueRole` | locatie | per gebruiker × locatie, 10 booleans |
+| `UserRole` → `Role` | event (rol) | benoemde rollen per event |
+| `EventUserPermission` | event (direct) | per categorie óf per gastenlijst; heeft limietvelden |
+| `Promotor.max_guests_per_event` / `CheckInProfile.allowed_guest_list_ids` | los | aparte eilandjes |
+
+De resolutie zit in `src/hooks/useEffectivePermissions.js`: app-admin en organisatie-eigenaar
+kortsluiten naar alles; daarna geldt **first-match-override**: EventUserPermission → event-Role →
+VenueRole → OrganizationRole → fallback. Limieten voor gastenlijsten en rol-quota zitten centraal
+in `src/lib/guestListLimits.js` (`checkAdditionsAllowed`), aangeroepen door AddGuestPanel,
+GuestManager en ImportGuestsDialog.
+
+## 2. Gevonden gaten (belangrijkste eerst)
+
+1. **`EventUserPermission`-limieten worden nooit gehandhaafd.** De velden `max_total_guests`,
+   `max_free_guests`, `can_add_from_date` en `can_add_until_date` zijn instelbaar in
+   EventPermissions.jsx, maar `checkAdditionsAllowed` leest ze niet. Een gastheer met "max 10
+   tickets tot vrijdag 18u" kan nu onbeperkt en altijd toevoegen.
+2. **Per-lijst-rechten lekken naar het hele event.** `eventPermissionsToFlags` neemt bij ontbreken
+   van een "all"-record de *meest permissieve* vlaggen over álle records. Wie `can_add` op één
+   gastenlijst heeft, krijgt daarmee `can_add` op het hele event; AddGuestPanel toont bovendien
+   alle lijsten in de dropdown. Alleen *bekijken* wordt per lijst beperkt (`allowedGuestListIds`).
+3. **Override in plaats van unie.** Attendium is additief (grants stapelen langs de keten). Bij ons
+   *vervangt* een lager record het hogere: wie op locatieniveau alles mag en daarna één klein
+   event-recht krijgt, verliest op dat event zijn locatierechten. Dat is verrassend en ondocumenteerd.
+4. **Standaard is "bekijken" in plaats van "niets".** `DEFAULT_PERMISSIONS` en het schema-default
+   van `can_view_guests` staan op `true`. Iemand zonder enig rechtenrecord die de event-URL kent,
+   ziet de volledige gastenlijst. Attendium hanteert default-deny (alleen de master user heeft
+   impliciet alles).
+5. **Geen "eigen gasten"-regel.** Attendium: `add_guests ⇒ eigen gasten zien/wijzigen/verwijderen`.
+   Bij ons bestaat het patroon half (EventDetails toont eigen gasten naast toegestane lijsten),
+   maar bewerken/verwijderen van eigen gasten vereist alsnog `can_edit_guests`/`can_delete_guests`,
+   en een promotor zonder `can_view` ziet zijn eigen lijst niet in het Check-in Station.
+6. **Quota zijn omzeilbaar via verwijderen.** Alle tellers zijn `som over actieve rijen`. Wie zijn
+   quotum vol heeft, kan ingecheckte gasten verwijderen en opnieuw toevoegen. Attendium telt
+   ingecheckt-en-verwijderd onherroepelijk mee.
+7. **Geen objectquotum ("Iedereen in totaal").** GuestList kent `max_capacity`/`max_free_guests`
+   per lijst, maar er is geen event-breed totaalplafond onafhankelijk van de som van
+   individuele limieten. `Event.capacity` bestaat als veld maar wordt niet als harde poort gebruikt.
+8. **Sjablonen dragen geen rechten.** `EventTemplate` heeft geen rechtenkoppeling; rechten voor
+   terugkerende events moeten per event opnieuw. Attendium gebruikt sjabloonrechten juist als
+   dé beheerroute voor reeksen.
+9. **Geen extern-gebruiker-concept.** Grants verwijzen naar e-mail, dus cross-organisatie werkt
+   technisch al half (Dashboard toont events met een EventUserPermission), maar er is geen
+   markering "extern", geen aparte UI-weergave en geen opzegflow.
+10. **Feature-gates ongehandhaafd.** `can_import_guests`/`can_export_guests` bestaan op
+    OrganizationRole maar de import/export-knoppen checken ze niet.
+
+## 3. Verbeterplan in drie fasen
+
+### Fase 1 — handhaving repareren (geen schemawijziging)
+
+- `checkAdditionsAllowed` uitbreiden met de EventUserPermission-limieten van de toevoegende
+  gebruiker (totaal, gratis, tijdslot), per lijst én voor "hele event"-records.
+- Per-lijst-scoping van `can_add`/`can_checkin`: de hook laat naast `allowedGuestListIds` (view)
+  ook `addableGuestListIds` en `checkinGuestListIds` teruggeven; AddGuestPanel/GuestManager/
+  ImportGuestsDialog filteren hun lijst-dropdowns daarop, en het "meest permissieve"-fallback
+  in `eventPermissionsToFlags` vervalt voor lijst-gebonden records.
+- "Eigen gasten"-regel: `can_add_guests ⇒` eigen rijen (op `added_by_email`) altijd zichtbaar,
+  bewerkbaar en verwijderbaar, ook zonder view/edit/delete-recht.
+- Default-deny: schema-default van `can_view_guests` naar `false` en `DEFAULT_PERMISSIONS`
+  op alles-uit; EventDetails toont dan een nette "geen toegang"-melding.
+- Import/export-knoppen achter `can_import_guests`/`can_export_guests`.
+
+### Fase 2 — unie-semantiek
+
+`useEffectivePermissions` herschrijven van first-match naar **unie van alle niveaus** (org ∪ venue ∪
+event-rol ∪ event-direct), met `admin ⇒ alles` per niveau en de bestaande kortsluitingen voor
+app-admin en organisatie-eigenaar. Voor limieten geldt de *meest beperkende* ingevulde waarde
+langs de keten; leeg = geen limiet op dat niveau. `inheritanceSource` wordt dan per vlag een
+bronlijst (voor "Van locatie"-badges in de UI, zoals Attendium die toont).
+
+### Fase 3 — schema-unificatie
+
+- Eén entiteit `PermissionGrant`: `user_email`, `scope_type`
+  (`organization|venue|event_template|event`), `scope_id`, nullable `guest_list_id`, de vlaggen
+  (`admin`, `view_guests`, `add_guests`, `edit_guests`, `delete_guests`, `check_in_guests`),
+  de limieten (`max_total`, `max_free`, `add_from_at`, `add_until_at`) en `is_external`.
+- Eén entiteit `ScopeQuota` voor "Iedereen in totaal": `scope_type`, `scope_id`, nullable
+  `guest_list_id`, `max_total`, `max_free`.
+- Monotone verbruiksteller: entiteit `QuotaUsage` (`event_id`, `user_email`, nullable
+  `guest_list_id`, `consumed_total`, `consumed_free`) die bij toevoegen ophoogt en bij
+  verwijderen alleen verlaagt wanneer de gast **nooit ingecheckt** was.
+- Rechten op `EventTemplate` die overerven naar events die het sjabloon gebruiken.
+- Migratie: VenueRole/EventUserPermission 1-op-1 omzetten naar grants; Role/UserRole en
+  OrganizationRole blijven als benoemde-rol-laag die bij toekenning naar grants "uitvouwt"
+  of als aparte bron in de unie blijft meedraaien.
+
+## 4. Kanttekening
+
+Alle handhaving is en blijft client-side (Base44-architectuur); wie de API rechtstreeks aanroept,
+omzeilt elke controle. Harde afdwinging vergt server-side regels of backend-functies — dat geldt
+voor het hele bestaande model en verandert niet door dit plan.

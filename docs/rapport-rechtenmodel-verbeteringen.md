@@ -86,13 +86,19 @@ Restpunt fase 1: de lijst-dropdowns in GuestManager zijn nog niet visueel gefilt
 add-scope (de centrale controle blokkeert wel), en de vlag-berekening bleef verder
 first-match-override — de unie komt in fase 2.
 
-### Fase 2 — unie-semantiek
+### Fase 2 — unie-semantiek (DOORGEVOERD)
 
-`useEffectivePermissions` herschrijven van first-match naar **unie van alle niveaus** (org ∪ venue ∪
-event-rol ∪ event-direct), met `admin ⇒ alles` per niveau en de bestaande kortsluitingen voor
-app-admin en organisatie-eigenaar. Voor limieten geldt de *meest beperkende* ingevulde waarde
-langs de keten; leeg = geen limiet op dat niveau. `inheritanceSource` wordt dan per vlag een
-bronlijst (voor "Van locatie"-badges in de UI, zoals Attendium die toont).
+`useEffectivePermissions` berekent de effectieve rechten nu als **unie van alle niveaus**
+(organisatierol ∪ locatierol ∪ event-rol ∪ directe event-machtigingen) in plaats van
+first-match-override: een klein event-recht kan iemands locatie- of organisatierechten dus niet
+meer per ongeluk vervangen. De kortsluitingen voor app-admin en organisatie-eigenaar blijven.
+De hook geeft daarnaast `flagSources` terug: per vlag de lijst van niveaus die hem toekennen
+(basis voor "Van locatie"-herkomstbadges in de UI). De gastenlijst-scopes gelden alleen nog
+wanneer géén breder niveau hetzelfde recht al event-breed geeft — dat is ook doorgetrokken in
+`checkAdditionsAllowed`, dat event-breed toevoegrecht via org-, locatie- of event-rol laat
+voorgaan op de lijst-scope van directe event-records. Limieten stapelen als *meest beperkende
+geldige waarde*: lijst-limieten, persoonlijke event-limieten en rol-quota worden allemaal
+toegepast; leeg = geen limiet op dat niveau.
 
 ### Fase 3 — schema-unificatie
 

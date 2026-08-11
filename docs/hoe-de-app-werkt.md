@@ -83,6 +83,7 @@ Daarnaast bestaan er nog per-gebruiker-per-evenement limieten (`EventUserPermiss
 ## 7. Check-in en verder
 
 - **Check-in**: elke gast krijgt een uniek toegangstoken/QR-code; bij de deur worden personen per gast afgevinkt, met onderscheid gratis/betaald.
+- **Gastbevestiging met QR-code**: de publieke bevestigingspagina (`GuestConfirmation?t=<token>`, gedeeld via de deel-dialoog) toont nu een echte, scanbare QR-code (`react-qr-code`, inhoud `GUEST:<gastId>` — het formaat dat het Check-in Station verwacht). De pagina toont ook de check-in-status en ververst die elke 15 seconden, zodat de gast na het scannen direct "Ingecheckt" ziet. `QRCodeDisplay` (QR-knop in de gast-dialoog) rendert dezelfde echte QR-code in plaats van het eerdere placeholder-icoon.
 - **Check-in Station**: een eigen pagina (`CheckInStation?id=<eventId>`, `src/pages/CheckInStation.jsx`) in plaats van een overlay binnen EventDetails. Zoeken op naam of QR-scannen, filterpills per categorie/gastenlijst, kolomkeuze, gast-detailpaneel en offline wachtrij. Oude links (`CheckIn?id=…` en `EventDetails?id=…&tab=checkin`) sturen automatisch door.
 - **Tafelplan / Table Manager**: bij locaties met tafelplan kunnen gasten aan tafels worden gekoppeld.
 - **Tags en aangepaste velden**: gasten kunnen getagd worden en per evenement kunnen extra invoervelden gedefinieerd worden.
